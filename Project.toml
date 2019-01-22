@@ -3,6 +3,9 @@ uuid = "3dbcfb66-1e13-11e9-3b2d-1921cc0ed38e"
 authors = ["Takafumi Arakaki <aka.tkf@gmail.com>"]
 version = "0.1.0"
 
+[deps]
+REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
+
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
