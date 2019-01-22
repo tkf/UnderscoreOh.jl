@@ -88,6 +88,74 @@ materialize(g::Call, x) = @G g.f(feed(x, g.args...)...; g.kwargs...)
 feed(x) = ()
 feed(x, a, args...) = (materialize(a, x), feed(x, args...)...)
 
+# --- Show it like you build it
+
+Base.show(io::IO, ::Hole) = print(io, "◻")
+Base.show(io::IO, g::Call) = @G show_impl(io, g.f, g.args, g.kwargs)
+
+function show_impl(io, f, args, kwargs)
+    print(io, f, '(')
+    if length(args) > 0
+        show(io, args[1])
+        for a in args[2:end]
+            print(io, ", ")
+            show(io, a)
+        end
+    end
+    if length(kwargs) > 0
+    end
+    print(io, ')')
+end
+
+function show_impl(io, f::binop_types, args, kwargs)
+    @assert length(kwargs) == 0
+    if length(args) > 0
+        show_term(io, f, args[1])
+        for a in args[2:end]
+            print(io, ' ', binop_map[f], ' ')
+            show_term(io, f, a)
+        end
+    end
+end
+
+function show_term(io, f, a)
+    if need_paren(f, a)
+        print(io, '(')
+        show(io, a)
+        print(io, ')')
+    else
+        show(io, a)
+    end
+end
+
+need_paren(f, g) = false
+need_paren(f, g::Call) = @G g.f isa binop_types && g.f !== f
+
+function show_impl(io, ::typeof(getproperty), args, kwargs)
+    value, (name::Symbol) = args
+    @assert length(args) == 2
+    @assert length(kwargs) == 0
+    show(io, value)
+    print(io, '.')
+    print(io, name)
+    return
+end
+
+function show_impl(io, ::typeof(getindex), args, kwargs)
+    @assert length(kwargs) == 0
+    show(io, args[1])
+    print(io, '[')
+    if length(args) > 1
+        show(io, args[2])
+        for a in args[3:end]
+            print(io, ", ")
+            show(io, a)
+        end
+    end
+    print(io, ']')
+    return
+end
+
 # --- User interface
 
 const ◻ = Hole()
