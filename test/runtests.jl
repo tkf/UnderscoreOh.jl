@@ -2,5 +2,6 @@ using Tofu
 using Test
 
 @testset "Tofu.jl" begin
-    # Write your own tests here.
+    @test (◻.x)((x=1,)) == 1
+    @test (◻.x + 2)((x=1,)) == 3
 end
