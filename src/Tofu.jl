@@ -2,6 +2,7 @@ module Tofu
 
 export ◻
 
+import LinearAlgebra
 import REPL
 
 togetfield(ex) = ex
@@ -36,10 +37,43 @@ call(f, args...; kwargs...) = Call(f, args, kwargs.data)
 Base.getproperty(g::Graph, name::Symbol) = call(getproperty, g, name)
 Base.getindex(g::Graph, idx...) = call(getindex, g, idx...)
 
-for op in [:+, :-, :*, :/, ://, :div]
-    @eval Base.$op(x::Graph, y) = call($op, x, y)
-    @eval Base.$op(x, y::Graph) = call($op, x, y)
-    @eval Base.$op(x::Graph, y::Graph) = call($op, x, y)
+const binop_symbols = [
+    :(=>),
+    :>, :<, :≥, :≤, :(==), :!=, :∈, :∉, :∋, :∌,
+    :+, :-, :|,
+    :*, :/, :÷, :%, :&, :⋅, :∘, :×, :\,
+    ://,
+    :<<, :>>, :>>>,
+    :^,
+]
+const binop_map = Dict(
+    if n in (:⋅, :×)
+        LinearAlgebra.dot => n
+    else
+        getproperty(Base, n) => n
+    end
+    for n in binop_symbols)
+const binop_types = Union{typeof.(keys(binop_map))...}
+
+for (f, name) in binop_map
+    mod = parentmodule(f)
+    @eval $mod.$name(x::Graph, y) = call($f, x, y)
+    @eval $mod.$name(x, y::Graph) = call($f, x, y)
+    @eval $mod.$name(x::Graph, y::Graph) = call($f, x, y)
+end
+
+# TODO: use https://github.com/JuliaDiff/DiffRules.jl
+# (or maybe https://github.com/JuliaDiff/ChainRules.jl if it's ready)
+
+const unaryops = [
+    ~,
+    adjoint,
+]
+
+for f in unaryops
+    mod = parentmodule(f)
+    name = nameof(f)
+    @eval $mod.$name(x::Graph) = call($f, x)
 end
 
 # --- Evaluation
