@@ -76,6 +76,22 @@ for f in unaryops
     @eval $mod.$name(x::Graph) = call($f, x)
 end
 
+Base.:(:)(x::Graph, y) = call(:, x, y)
+Base.:(:)(x, y::Graph) = call(:, x, y)
+Base.:(:)(x::Graph, y::Graph) = call(:, x, y)
+Base.:(:)(x::Graph, y, z) = call(:, x, y, z)
+Base.:(:)(x, y::Graph, z) = call(:, x, y, z)
+Base.:(:)(x, y, z::Graph) = call(:, x, y, z)
+Base.:(:)(x::Graph, y::Graph, z) = call(:, x, y, z)
+Base.:(:)(x::Graph, y, z::Graph) = call(:, x, y, z)
+Base.:(:)(x, y::Graph, z::Graph) = call(:, x, y, z)
+Base.:(:)(x::Graph, y::Graph, z::Graph) = call(:, x, y, z)
+
+# Disambiguation:
+Base.:(:)(x::T, y::Graph, z::T) where {T <: Real} = call(:, x, y, z)
+Base.:(:)(x::T, y::Graph, z::T) where {T} = call(:, x, y, z)
+Base.:(:)(x::Real, y::Graph, z::Real) = call(:, x, y, z)
+
 # --- Evaluation
 
 (g::Hole)(x) = materialize(g, x)
@@ -153,6 +169,18 @@ function show_impl(io, ::typeof(getindex), args, kwargs)
         end
     end
     print(io, ']')
+    return
+end
+
+function show_impl(io, ::Colon, args, kwargs)
+    @assert length(kwargs) == 0
+    if length(args) > 0
+        show(io, args[1])
+        for a in args[2:end]
+            print(io, ":")
+            show(io, a)
+        end
+    end
     return
 end
 
