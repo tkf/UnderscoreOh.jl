@@ -48,7 +48,7 @@ const binop_symbols = [
 ]
 const binop_map = Dict(
     if n in (:⋅, :×)
-        LinearAlgebra.dot => n
+        getproperty(LinearAlgebra, n) => n
     else
         getproperty(Base, n) => n
     end
