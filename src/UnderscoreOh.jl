@@ -1,27 +1,9 @@
 module UnderscoreOh
 
-export ◻
+export _o
 
 import LinearAlgebra
 import REPL
-
-togetfield(ex) = ex
-togetfield(ex::Expr) =
-    if ex.head == :. && ex.args[1] == :g
-        @assert length(ex.args) == 2
-        :($getfield(g, $(ex.args[2])))
-    else
-        Expr(ex.head, togetfield.(ex.args)...)
-    end
-
-"""
-  @G ex
-
-Convert `g.PROPERTY` in `ex` to `getfield(g, :PROPERTY)`.
-"""
-macro G(ex)
-    esc(togetfield(ex))
-end
 
 # --- Call graph
 
@@ -35,7 +17,12 @@ end
 call(f, args...; kwargs...) = Call(f, args, kwargs.data)
 
 Base.getproperty(g::Graph, name::Symbol) = call(getproperty, g, name)
+Base.getproperty(g::Graph, prop) = call(getproperty, g, prop)
 Base.getindex(g::Graph, idx...) = call(getindex, g, idx...)
+
+_f(x) = getfield(x, :f)
+_args(x) = getfield(x, :args)
+_kwargs(x) = getfield(x, :kwargs)
 
 const binop_symbols = [
     :(=>),
@@ -99,15 +86,15 @@ Base.:(:)(x::Real, y::Graph, z::Real) = call(:, x, y, z)
 
 materialize(y, _) = y
 materialize(g::Hole, x) = x
-materialize(g::Call, x) = @G g.f(feed(x, g.args...)...; g.kwargs...)
+materialize(g::Call, x) = _f(g)(feed(x, _args(g)...)...; _kwargs(g)...)
 
 feed(x) = ()
 feed(x, a, args...) = (materialize(a, x), feed(x, args...)...)
 
 # --- Show it like you build it
 
-Base.show(io::IO, ::Hole) = print(io, "◻")
-Base.show(io::IO, g::Call) = @G show_impl(io, g.f, g.args, g.kwargs)
+Base.show(io::IO, ::Hole) = print(io, "_o")
+Base.show(io::IO, g::Call) = show_impl(io, _f(g), _args(g), _kwargs(g))
 
 function show_impl(io, f, args, kwargs)
     print(io, f, '(')
@@ -145,7 +132,7 @@ function show_term(io, f, a)
 end
 
 need_paren(f, g) = false
-need_paren(f, g::Call) = @G g.f isa binop_types && g.f !== f
+need_paren(f, g::Call) = _f(g) isa binop_types && _f(g) !== f
 
 function show_impl(io, ::typeof(getproperty), args, kwargs)
     value, (name::Symbol) = args
@@ -186,14 +173,6 @@ end
 
 # --- User interface
 
-const ◻ = Hole()
-
-function __init__()
-    try
-        REPL.REPLCompletions.latex_symbols["\\tofu"] = "◻"
-    catch err
-        @error "Incompatible REPL module; Disabling LaTeX command `\\tofu`" err
-    end
-end
+const _o = Hole()
 
 end # module
