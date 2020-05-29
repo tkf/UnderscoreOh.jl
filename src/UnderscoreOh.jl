@@ -1,13 +1,13 @@
 module UnderscoreOh
 
-export _o
+export _o, _nt
 
+using Base.Broadcast: Broadcasted
 import LinearAlgebra
-import REPL
 
 # --- Call graph
 
-abstract type Graph end
+abstract type Graph <: Function end
 struct Hole <: Graph end
 struct Call{F,A,K} <: Graph
     f::F
@@ -42,42 +42,33 @@ const binop_map = Dict(
     for n in binop_symbols)
 const binop_types = Union{typeof.(keys(binop_map))...}
 
-for (f, name) in binop_map
-    mod = parentmodule(f)
-    @eval $mod.$name(x::Graph, y) = call($f, x, y)
-    @eval $mod.$name(x, y::Graph) = call($f, x, y)
-    @eval $mod.$name(x::Graph, y::Graph) = call($f, x, y)
-end
-
-# TODO: use https://github.com/JuliaDiff/DiffRules.jl
-# (or maybe https://github.com/JuliaDiff/ChainRules.jl if it's ready)
-
 const unaryops = [
     ~,
     adjoint,
 ]
 
-for f in unaryops
-    mod = parentmodule(f)
-    name = nameof(f)
-    @eval $mod.$name(x::Graph) = call($f, x)
+# --- Broadcasting
+
+struct UnderscoreOhStyle <: Broadcast.BroadcastStyle end
+Base.BroadcastStyle(::Type{<:Graph}) = UnderscoreOhStyle()
+Base.BroadcastStyle(::UnderscoreOhStyle, ::Broadcast.BroadcastStyle) = UnderscoreOhStyle()
+
+Base.broadcastable(x::Graph) = x
+Broadcast.instantiate(bc::Broadcasted{UnderscoreOhStyle}) = bc
+
+# Convert broadcasted to a callable
+Base.copy(bc::Broadcasted{UnderscoreOhStyle}) = asgraph(bc)
+
+asgraph(x) = x
+asgraph(bc::Broadcasted) = call(bc.f, map(asgraph, bc.args)...)
+
+function _nt(; kwargs...)
+    if any(x -> x isa Graph, values(kwargs))
+        return call(_nt; kwargs...)
+    else
+        return (; kwargs...)
+    end
 end
-
-Base.:(:)(x::Graph, y) = call(:, x, y)
-Base.:(:)(x, y::Graph) = call(:, x, y)
-Base.:(:)(x::Graph, y::Graph) = call(:, x, y)
-Base.:(:)(x::Graph, y, z) = call(:, x, y, z)
-Base.:(:)(x, y::Graph, z) = call(:, x, y, z)
-Base.:(:)(x, y, z::Graph) = call(:, x, y, z)
-Base.:(:)(x::Graph, y::Graph, z) = call(:, x, y, z)
-Base.:(:)(x::Graph, y, z::Graph) = call(:, x, y, z)
-Base.:(:)(x, y::Graph, z::Graph) = call(:, x, y, z)
-Base.:(:)(x::Graph, y::Graph, z::Graph) = call(:, x, y, z)
-
-# Disambiguation:
-Base.:(:)(x::T, y::Graph, z::T) where {T <: Real} = call(:, x, y, z)
-Base.:(:)(x::T, y::Graph, z::T) where {T} = call(:, x, y, z)
-Base.:(:)(x::Real, y::Graph, z::Real) = call(:, x, y, z)
 
 # --- Evaluation
 
@@ -86,14 +77,26 @@ Base.:(:)(x::Real, y::Graph, z::Real) = call(:, x, y, z)
 
 materialize(y, _) = y
 materialize(g::Hole, x) = x
-materialize(g::Call, x) = _f(g)(feed(x, _args(g)...)...; _kwargs(g)...)
+materialize(g::Call, x) = _f(g)(feed(x, _args(g))...; feed(x, _kwargs(g))...)
 
-feed(x) = ()
-feed(x, a, args...) = (materialize(a, x), feed(x, args...)...)
+feed(x, args::Tuple) = map(a -> materialize(a, x), args)
+feed(x, kwargs::NamedTuple) = _map(a -> materialize(a, x), kwargs)
+
+_map(f, xs::NamedTuple{names}) where {names} = NamedTuple{names}(map(f, Tuple(xs)))
+
+# --- Indexing
+
+# Base.getindex(x::AbstractArray, g::Graph) = g.(x)
 
 # --- Show it like you build it
 
-Base.show(io::IO, ::Hole) = print(io, "_o")
+maybe_print_dot(io) =
+    get(io, :_secrete_print_dot_key, true) ? print(io, '.') : nothing
+unset_print_dot(io) = IOContext(io, :_secrete_print_dot_key => false)
+
+@nospecialize
+
+Base.show(io::IO, ::Hole) = printstyled(io, "_o"; color = :light_black)
 Base.show(io::IO, g::Call) = show_impl(io, _f(g), _args(g), _kwargs(g))
 
 function show_impl(io, f, args, kwargs)
@@ -106,6 +109,17 @@ function show_impl(io, f, args, kwargs)
         end
     end
     if length(kwargs) > 0
+        print(io, "; ")
+        isfirst = true
+        for (k, v) in pairs(kwargs)
+            if isfirst
+                isfirst = false
+            else
+                print(io, ", ")
+            end
+            print(io, k, "=")
+            show(io, v)
+        end
     end
     print(io, ')')
 end
@@ -115,7 +129,9 @@ function show_impl(io, f::binop_types, args, kwargs)
     if length(args) > 0
         show_term(io, f, args[1])
         for a in args[2:end]
-            print(io, ' ', binop_map[f], ' ')
+            print(io, ' ')
+            maybe_print_dot(io)
+            print(io, binop_map[f], ' ')
             show_term(io, f, a)
         end
     end
@@ -123,6 +139,7 @@ end
 
 function show_term(io, f, a)
     if need_paren(f, a)
+        maybe_print_dot(io)
         print(io, '(')
         show(io, a)
         print(io, ')')
@@ -159,17 +176,15 @@ function show_impl(io, ::typeof(getindex), args, kwargs)
     return
 end
 
-function show_impl(io, ::Colon, args, kwargs)
-    @assert length(kwargs) == 0
-    if length(args) > 0
-        show(io, args[1])
-        for a in args[2:end]
-            print(io, ":")
-            show(io, a)
-        end
-    end
-    return
+function Base.show(io::IO, ::MIME"text/plain", g::Graph)
+    print(io, _o, " -> ")
+    show(unset_print_dot(io), g)
 end
+
+# `Base.Function` defines those methods to be something different
+Base.print(io::IO, g::Graph) = show(io, g)
+
+@specialize
 
 # --- User interface
 
