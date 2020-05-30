@@ -1,7 +1,8 @@
 module TestUnderscoreOh
 
-using UnderscoreOh
+using Documenter: doctest
 using Test
+using UnderscoreOh
 
 struct IdentityProperties end
 Base.getproperty(::IdentityProperties, x::Symbol) = x
@@ -57,6 +58,10 @@ sshow3(x; kwargs...) = sprint(show, MIME"text/plain"(), x; kwargs...)
         @test !isempty(repr(getproperty(_o, nothing))::AbstractString)
         @test !isempty(repr(getproperty(_o, [1, 2]))::AbstractString)
     end
+end
+
+@testset "doctest" begin
+    doctest(UnderscoreOh, manual = false)
 end
 
 end  # module
