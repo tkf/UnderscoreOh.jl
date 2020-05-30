@@ -18,6 +18,11 @@ Base.getproperty(::IdentityProperties, x) = x
     @test _nt(X = (_o.x))((x = 1,)) == (X = 1,)
 end
 
+@testset "~" begin
+    @test identity.(~ _o.x) === ~(_o.x)
+    @test identity.(~(_o .+ 1)) === ~(_o .+ 1)
+end
+
 const DATASET_REPR = [
     # Desired `repr(_)` outputs:
     "_o",

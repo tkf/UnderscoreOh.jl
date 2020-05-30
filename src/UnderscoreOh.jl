@@ -64,6 +64,14 @@ function asgraph(bc::Broadcasted)
     end
 end
 
+struct Guarded{F} <: Function
+    f::F
+end
+(g::Guarded)(x) = _f(g)(x)
+
+Base.:~(g::Graph) = Guarded(g)
+Base.:~(::Hole, g::Graph) = Guarded(g)
+
 function _nt(; kwargs...)
     if any(x -> x isa Graph, values(kwargs))
         return call(_nt; kwargs...)
@@ -195,7 +203,13 @@ function show_impl(io, ::typeof(getindex), args, kwargs)
     return
 end
 
-function Base.show(io::IO, ::MIME"text/plain", g::Graph)
+function Base.show(io::IO, g::Guarded)
+    print(io, "~(")
+    show(io, _f(g))
+    print(io, ")")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", g::Union{Graph,Guarded})
     if get(io, :compact, false) === true
         printstyled(io, '('; color = :light_black)
         show(io, g)
@@ -211,6 +225,7 @@ end
 
 # `Base.Function` defines those methods to be something different
 Base.print(io::IO, g::Graph) = show(io, g)
+Base.print(io::IO, g::Guarded) = show(io, g)
 
 @specialize
 
