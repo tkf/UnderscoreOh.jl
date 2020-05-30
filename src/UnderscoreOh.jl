@@ -13,15 +13,20 @@ struct Call{F,A,K} <: Graph
     args::A
     kwargs::K
 end
+struct GetProperty{name,T} <: Graph
+    object::T
+end
+GetProperty{name}(x::T) where {name,T} = GetProperty{name,T}(x)
 call(f, args...; kwargs...) = Call(f, args, kwargs.data)
 
-Base.getproperty(g::Graph, name::Symbol) = call(getproperty, g, name)
+Base.getproperty(g::Graph, name::Symbol) = GetProperty{name}(g)
 Base.getproperty(g::Graph, prop) = call(getproperty, g, prop)
 Base.getindex(g::Graph, idx...) = call(getindex, g, idx...)
 
 _f(x) = getfield(x, :f)
 _args(x) = getfield(x, :args)
 _kwargs(x) = getfield(x, :kwargs)
+_object(x) = getfield(x, :object)
 
 # --- Broadcasting
 
@@ -71,10 +76,13 @@ end
 
 (g::Hole)(x) = materialize(g, x)
 (g::Call)(x) = materialize(g, x)
+(g::GetProperty)(x) = materialize(g, x)
 
 materialize(y, _) = y
 materialize(g::Hole, x) = x
 materialize(g::Call, x) = _f(g)(feed(x, _args(g))...; feed(x, _kwargs(g))...)
+materialize(g::GetProperty{name}, x) where {name} =
+    getproperty(materialize(_object(g), x), name)
 
 feed(x, args::Tuple) = map(a -> materialize(a, x), args)
 feed(x, kwargs::NamedTuple) = _map(a -> materialize(a, x), kwargs)
@@ -94,6 +102,8 @@ unset_print_dot(io) = IOContext(io, :_secrete_print_dot_key => false)
 
 Base.show(io::IO, ::Hole) = printstyled(io, "_o"; color = :light_black)
 Base.show(io::IO, g::Call) = show_impl(io, _f(g), _args(g), _kwargs(g))
+Base.show(io::IO, g::GetProperty{name}) where {name} =
+    show_impl(io, getproperty, (_object(g), name), NamedTuple())
 
 is_binop(f) = Base.isbinaryoperator(nameof(f))
 
