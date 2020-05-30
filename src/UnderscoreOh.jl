@@ -3,7 +3,6 @@ module UnderscoreOh
 export _o, _nt
 
 using Base.Broadcast: Broadcasted
-import LinearAlgebra
 
 # --- Call graph
 
@@ -23,29 +22,6 @@ Base.getindex(g::Graph, idx...) = call(getindex, g, idx...)
 _f(x) = getfield(x, :f)
 _args(x) = getfield(x, :args)
 _kwargs(x) = getfield(x, :kwargs)
-
-const binop_symbols = [
-    :(=>),
-    :>, :<, :≥, :≤, :(==), :!=, :∈, :∉, :∋, :∌,
-    :+, :-, :|,
-    :*, :/, :÷, :%, :&, :⋅, :×, :\,
-    ://,
-    :<<, :>>, :>>>,
-    :^,
-]
-const binop_map = Dict(
-    if n in (:⋅, :×)
-        getproperty(LinearAlgebra, n) => n
-    else
-        getproperty(Base, n) => n
-    end
-    for n in binop_symbols)
-const binop_types = Union{typeof.(keys(binop_map))...}
-
-const unaryops = [
-    ~,
-    adjoint,
-]
 
 # --- Broadcasting
 
@@ -99,7 +75,20 @@ unset_print_dot(io) = IOContext(io, :_secrete_print_dot_key => false)
 Base.show(io::IO, ::Hole) = printstyled(io, "_o"; color = :light_black)
 Base.show(io::IO, g::Call) = show_impl(io, _f(g), _args(g), _kwargs(g))
 
+is_binop(f) = Base.isbinaryoperator(nameof(f))
+
 function show_impl(io, f, args, kwargs)
+    if length(args) > 0 && isempty(kwargs) && is_binop(f)
+        # Print as binary operator:
+        show_term(io, f, args[1])
+        for a in args[2:end]
+            print(io, ' ')
+            maybe_print_dot(io)
+            print(io, nameof(f), ' ')
+            show_term(io, f, a)
+        end
+        return
+    end
     print(io, f, '(')
     if length(args) > 0
         show(io, args[1])
@@ -124,22 +113,8 @@ function show_impl(io, f, args, kwargs)
     print(io, ')')
 end
 
-function show_impl(io, f::binop_types, args, kwargs)
-    @assert length(kwargs) == 0
-    if length(args) > 0
-        show_term(io, f, args[1])
-        for a in args[2:end]
-            print(io, ' ')
-            maybe_print_dot(io)
-            print(io, binop_map[f], ' ')
-            show_term(io, f, a)
-        end
-    end
-end
-
 function show_term(io, f, a)
     if need_paren(f, a)
-        maybe_print_dot(io)
         print(io, '(')
         show(io, a)
         print(io, ')')
@@ -149,7 +124,7 @@ function show_term(io, f, a)
 end
 
 need_paren(f, g) = false
-need_paren(f, g::Call) = _f(g) isa binop_types && _f(g) !== f
+need_paren(f, g::Call) = is_binop(_f(g)) && _f(g) !== f
 
 function show_impl(io, ::typeof(getproperty), args, kwargs)
     value, (name::Symbol) = args
