@@ -140,3 +140,11 @@ _o -> _nt(; a=_o.x + 1, b=2) (generic function with 1 method)
 julia> _nt(a = _o.x .+ 1, b = 2)((x = 1,))
 (a = 2, b = 2)
 ```
+
+## Similar packages
+
+* https://github.com/c42f/Underscores.jl
+* https://github.com/c42f/MagicUnderscores.jl
+* https://github.com/haberdashPI/LambdaFn.jl
+* https://github.com/tkf/Tofu.jl
+* https://github.com/tkf/AtBackslash.jl
