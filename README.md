@@ -146,5 +146,6 @@ julia> _nt(a = _o.x .+ 1, b = 2)((x = 1,))
 * https://github.com/c42f/Underscores.jl
 * https://github.com/c42f/MagicUnderscores.jl
 * https://github.com/haberdashPI/LambdaFn.jl
+* https://github.com/Tokazama/ChainedFixes.jl
 * https://github.com/tkf/Tofu.jl
 * https://github.com/tkf/AtBackslash.jl
