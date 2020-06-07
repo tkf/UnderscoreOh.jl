@@ -14,7 +14,7 @@ created with syntax like `x -> ...` and `function (x) ... end`:
   generated with the same expression and the same context.  It allows
   `julia` to re-use JIT-compiled anonymous callables.
 
-* Simple callbales are easier to build with UnderscoreOh.jl API.
+* Simple callables are easier to build with UnderscoreOh.jl API.
 
 * Variables are captured by value (i.e., no infamous `Box`ing).
 
