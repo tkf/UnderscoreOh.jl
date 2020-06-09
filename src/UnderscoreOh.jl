@@ -88,20 +88,27 @@ end
 
 # --- Evaluation
 
-(g::Hole)(x) = materialize(g, x)
-(g::Call)(x) = materialize(g, x)
-(g::GetProperty)(x) = materialize(g, x)
+@inline (g::Hole)(x) = materialize(g, x)
+@inline (g::Call)(x) = materialize(g, x)
+@inline (g::GetProperty)(x) = materialize(g, x)
 
-materialize(y, _) = y
-materialize(g::Hole, x) = x
-materialize(g::Call, x) = _f(g)(feed(x, _args(g))...; feed(x, _kwargs(g))...)
-materialize(g::GetProperty{name}, x) where {name} =
+@inline materialize(y, _) = y
+@inline materialize(g::Hole, x) = x
+@inline materialize(g::Call, x) = _f(g)(feed(x, _args(g))...; feed(x, _kwargs(g))...)
+@inline materialize(g::GetProperty{name}, x) where {name} =
     getproperty(materialize(_object(g), x), name)
 
-feed(x, args::Tuple) = map(a -> materialize(a, x), args)
-feed(x, kwargs::NamedTuple) = _map(a -> materialize(a, x), kwargs)
+@inline feed(x, args::Tuple) = map(fix2(materialize, x), args)
+@inline feed(x, kwargs::NamedTuple) = _map(fix2(materialize, x), kwargs)
 
-_map(f, xs::NamedTuple{names}) where {names} = NamedTuple{names}(map(f, Tuple(xs)))
+@inline _map(f, xs::NamedTuple{names}) where {names} = NamedTuple{names}(map(f, Tuple(xs)))
+
+@inline function fix2(f, a2)
+    @inline function fixed(a1)
+        return f(a1, a2)
+    end
+    return fixed
+end
 
 # --- Indexing
 
