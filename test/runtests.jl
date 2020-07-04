@@ -17,6 +17,8 @@ Base.getproperty(::IdentityProperties, x) = x
     @test (_o."p")(IdentityProperties()) == "p"
     @test (_o.x[2]."p")((x = (11, IdentityProperties()),)) == "p"
     @test _nt(X = (_o.x))((x = 1,)) == (X = 1,)
+    @test haskey.(_o, :a)((a = 1,))
+    @test !haskey.(_o, :a)((b = 1,))
 end
 
 @testset "~" begin

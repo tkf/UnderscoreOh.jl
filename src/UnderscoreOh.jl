@@ -60,6 +60,7 @@ end
 Base.copy(bc::Broadcasted{UnderscoreOhStyle}) = asgraph(bc)
 
 asgraph(x) = x
+asgraph(x::Ref) = x[]
 function asgraph(bc::Broadcasted)
     if bc.f isa KWBroadcastedInner
         args = map(asgraph, bc.args)
